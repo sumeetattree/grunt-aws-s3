@@ -20,7 +20,6 @@ var Progress = require('progress');
 module.exports = function (grunt) {
 
 	grunt.registerMultiTask('aws_s3', 'Interact with AWS S3 using the AWS SDK', function () {
-
 		var done = this.async();
 
 		var options = this.options({
@@ -39,7 +38,13 @@ module.exports = function (grunt) {
 			stream: false,
 			displayChangesOnly: false,
 			progress: 'dots',
-			overwrite: true,
+
+      // Possible values are:
+      // skip 				- skip overwrite, logs a warning
+      // force 				- overwrite the destination with source file, logs a warning
+      // halt					- immediately exists the process
+      // differential - looks at options.differential to decide if the file should be uploaded
+			overwrite: 'differential',
 			changedFiles: 'aws_s3_changed',
 			compressionTypes: {'.br': 'br', '.gz': 'gzip'}
 		});
@@ -51,9 +56,9 @@ module.exports = function (grunt) {
 		}
 
 		var filePairOptions = {
-			differential: options.differential, 
-			stream: options.stream, 
-			flipExclude: false, 
+			differential: options.differential,
+			stream: options.stream,
+			flipExclude: false,
 			exclude: false
 		};
 
@@ -63,8 +68,9 @@ module.exports = function (grunt) {
 		}
 
 		if (options.awsProfile) {
-			var credentials = new AWS.SharedIniFileCredentials({profile: options.awsProfile});
-			AWS.config.credentials = credentials;
+			AWS.config.credentials = new AWS.SharedIniFileCredentials({
+				profile: options.awsProfile
+			});
 		}
 
 		if (['dots','progressBar','none'].indexOf(options.progress) < 0) {
@@ -72,35 +78,35 @@ module.exports = function (grunt) {
 			options.progress = 'dots';
 		}
 
+		if (['skip', 'force', 'halt', 'differential'].indexOf(options.overwrite) == -1) {
+			grunt.log.writeln(('Invalid overwrite mode `' + options.overwrite + '`. Falling back to default mode: skip').yellow);
+			options.overwrite = 'skip';
+		}
+
 		// List of acceptable params for an upload
-		var put_params = ['CacheControl', 'ContentDisposition', 'ContentEncoding',
+		var putParams = ['CacheControl', 'ContentDisposition', 'ContentEncoding',
 			'ContentLanguage', 'ContentLength', 'ContentMD5', 'Expires', 'GrantFullControl',
 			'GrantRead', 'GrantReadACP', 'GrantWriteACP', 'Metadata', 'ServerSideEncryption',
 			'StorageClass', 'WebsiteRedirectLocation', 'ContentType'];
 
-		// Checks that all params are in put_params
-		var isValidParams = function (params) {
-
-			return _.every(_.keys(params), function (key) { 
-				return _.contains(put_params, key); 
-			});
+		// Checks that all params are in putParams
+		var isValidParams = function (maybeObject) {
+			var params = grunt.util.kindOf(maybeObject) == 'object' ? _.keys(maybeObject) : maybeObject;
+			return _.difference(params, putParams).length == 0;
 		};
 
-		var getObjectURL = function (file) {
-
-			file = file || '';
-			var prefix = ''
+		var getObjectURL = function (file = '') {
+			var prefix = '';
 
 			if (!options.mock) {
-				prefix = s3.endpoint.href
+				prefix = s3.endpoint.href;
 			}
-			
+
 			return prefix + options.bucket + '/' + file;
 		};
 
-		// Get the key URL relative to a path string 
+		// Get the key URL relative to a path string
 		var getRelativeKeyPath = function (key, dest) {
-
 			var path;
 
 			if (_.last(dest) === '/') {
@@ -118,66 +124,56 @@ module.exports = function (grunt) {
 		};
 
 		var hashFile = function (options, callback) {
-
 			if (options.stream) {
-				var local_stream = fs.ReadStream(options.file_path);
+				var localStream = fs.ReadStream(options.filePath);
 				var hash = crypto.createHash('md5');
 
-				local_stream.on('end', function () {
+				localStream.on('end', function () {
 					// S3's ETag has quotes around it...
 					callback(null, '"' + hash.digest('hex') + '"');
 				});
 
-				local_stream.on('error', function (err) {
-					callback(err);
-				});
-
-				local_stream.on('data', function (data) {
-					hash.update(data);
-				});
+				localStream.on('error', callback);
+				localStream.on('data', hash.update);
 			}
 			else {
-				var local_buffer = grunt.file.read(options.file_path, { encoding: null });
-				callback(null, '"' + crypto.createHash('md5').update(local_buffer).digest('hex') + '"');
+				var localBuffer = grunt.file.read(options.filePath, { encoding: null });
+				callback(null, '"' + crypto.createHash('md5').update(localBuffer).digest('hex') + '"');
 			}
 		};
 
 		// Checks that local file is 'date_compare' than server file
 		var checkFileDate = function (options, callback) {
-
-			fs.stat(options.file_path, function (err, stats) {
-
+			fs.stat(options.filePath, function (err, stats) {
 				if (err) {
 					callback(err);
 				}
 				else {
-					var local_date = new Date(stats.mtime).getTime();
-					var server_date = new Date(options.server_date).getTime();
+					var localDate = new Date(stats.mtime).getTime();
+					var serverDate = new Date(options.serverDate).getTime();
 
-					if (options.compare_date === 'newer') {
-						callback(null, local_date > server_date);
+					if (options.compareDate === 'newer') {
+						callback(null, localDate > serverDate);
 					}
 					else {
-						callback(null, local_date < server_date);
+						callback(null, localDate < serverDate);
 					}
 				}
 			});
 		};
 
 		var isFileDifferent = function (options, callback) {
-			
-			hashFile(options, function (err, md5_hash) {
-
+			hashFile(options, function (err, md5Hash) {
 				if (err) {
 					callback(err);
 				}
 				else {
-					if (md5_hash === options.server_hash) {
+					if (md5Hash === options.serverHash) {
 						callback(null, false);
 					}
 					else {
-						if (options.server_date) {
-							options.compare_date = options.compare_date || 'older';
+						if (options.serverDate) {
+							options.compareDate = options.compareDate || 'older';
 							checkFileDate(options, callback);
 						}
 						else {
@@ -192,7 +188,7 @@ module.exports = function (grunt) {
 			grunt.warn("Missing bucket in options");
 		}
 
-		var s3_options = {
+		var s3Options = {
 			bucket: options.bucket,
 			accessKeyId: options.accessKeyId,
 			secretAccessKey: options.secretAccessKey,
@@ -201,35 +197,33 @@ module.exports = function (grunt) {
 
 		if (!options.region) {
 			grunt.log.writeln("No region defined. S3 will default to US Standard\n".yellow);
-		} 
+		}
 		else {
-			s3_options.region = options.region;
+			s3Options.region = options.region;
 		}
 
 		if (options.endpoint) {
-			s3_options.endpoint = options.endpoint;
+			s3Options.endpoint = options.endpoint;
 		}
 
 		if (options.params) {
 			if (!isValidParams(options.params)) {
-				grunt.warn('"params" can only be ' + put_params.join(', '));
+				grunt.warn('"params" can only be ' + putParams.join(', '));
 			}
 		}
 
 		// Allow additional (not required) options
-		_.extend(s3_options, _.pick(options, ['maxRetries', 'sslEnabled', 'httpOptions', 'signatureVersion', 's3ForcePathStyle']));
+		_.extend(s3Options, _.pick(options, ['maxRetries', 'sslEnabled', 'httpOptions', 'signatureVersion', 's3ForcePathStyle']));
 
-		var s3 = new AWS.S3(s3_options);
-
+		var s3 = new AWS.S3(s3Options);
 		var dest;
-		var is_expanded;
+		var isExpanded;
 		var objects = [];
 		var uploads = [];
 
-		// Because Grunt expands the files array automatically, 
+		// Because Grunt expands the files array automatically,
 		// we need to group the uploads together to make the difference between actions.
 		var pushUploads = function() {
-
 			if (uploads.length > 0) {
 				objects.push({ action: 'upload', files: uploads });
 				uploads = [];
@@ -237,7 +231,7 @@ module.exports = function (grunt) {
 		};
 
 		var missingExpand = _.find(this.files, function(filePair) {
-			return ! filePair.orig.expand			// expand not specified
+			return ! filePair.orig.expand														// expand not specified
 				&& (! filePair.action || filePair.action == 'upload')	// upload request or default
 				&& filePair.cwd;
 		});
@@ -245,13 +239,11 @@ module.exports = function (grunt) {
 		if (missingExpand) {
 			grunt.warn("File upload action has 'cwd' but is missing 'expand: true', src list will not expand!");
 		}
-		
-		this.files.forEach(function (filePair) {
 
-			is_expanded = filePair.orig.expand || false;
+		this.files.forEach(function (filePair) {
+			isExpanded = filePair.orig.expand || false;
 
 			if (filePair.action === 'delete') {
-
 				_.defaults(filePair, filePairOptions);
 
 				if (!filePair.dest) {
@@ -264,12 +256,11 @@ module.exports = function (grunt) {
 				pushUploads();
 
 				filePair.dest = (filePair.dest === '/') ? '' : filePair.dest;
-				
+
 				objects.push(filePair);
 			}
 			else if (filePair.action === 'download') {
-
-				if (is_expanded) {
+				if (isExpanded) {
 					grunt.fatal('You cannot expand the "src" for downloads');
 				}
 				else if (!filePair.dest) {
@@ -286,8 +277,7 @@ module.exports = function (grunt) {
 				objects.push(_.defaults(filePair, filePairOptions));
 			}
 			else if (filePair.action === 'copy') {
-
-				if (is_expanded) {
+				if (isExpanded) {
 					grunt.fatal('You cannot expand the "src" for copies');
 				}
 				else if (!filePair.dest) {
@@ -304,25 +294,22 @@ module.exports = function (grunt) {
 				objects.push(_.defaults(filePair, filePairOptions));
 			}
 			else {
-
 				if (!filePair.dest) {
 					grunt.fatal("Specify a dest for uploads (e.g. '/' for the root)");
 				}
 				else if (filePair.params && !isValidParams(filePair.params)) {
-					grunt.warn('"params" can only be ' + put_params.join(', '));
+					grunt.warn('"params" can only be ' + putParams.join(', '));
 				}
 				else {
 					filePair.params = _.defaults(filePair.params || {}, options.params);
 					_.defaults(filePair, filePairOptions);
 
 					filePair.src.forEach(function (src) {
-
 						// Prevents creating empty folders
 						if (!grunt.file.isDir(src)) {
-
 							if (_.last(filePair.dest) === '/') {
-								dest = (is_expanded) ? filePair.dest : unixifyPath(path.join(filePair.dest, src));
-							} 
+								dest = (isExpanded) ? filePair.dest : unixifyPath(path.join(filePair.dest, src));
+							}
 							else {
 								dest = filePair.dest;
 							}
@@ -335,8 +322,8 @@ module.exports = function (grunt) {
 							if (dest !== '.') {
 
 								uploads.push(_.defaults({
-									need_upload: true,
-									src: src, 
+									needUpload: true,
+									src: src,
 									dest: dest
 								}, filePair));
 							}
@@ -350,11 +337,10 @@ module.exports = function (grunt) {
 
 		// Will list *all* the content of the bucket given in options
 		// Recursively requests the bucket with a marker if there's more than
-		// 1000 objects. Ensures uniqueness of keys in the returned list. 
+		// 1000 objects. Ensures uniqueness of keys in the returned list.
 		var listObjects = function (prefix, callback, marker, contents) {
-
 			var search = {
-				Prefix: prefix, 
+				Prefix: prefix,
 				Bucket: options.bucket
 			};
 
@@ -362,35 +348,30 @@ module.exports = function (grunt) {
 				search.Marker = marker;
 			}
 
-			s3.listObjects(search, function (err, list) { 
-
-				if (!err) {
-
-					var objects = (contents) ? contents.concat(list.Contents) : list.Contents;
-
-					if (list.IsTruncated) {
-						var new_marker = _.last(list.Contents).Key;
-						listObjects(prefix, callback, new_marker, objects);
-					}
-					else {
-						callback(_.uniq(objects, function (o) { return o.Key; }));
-					}
+			s3.listObjects(search, function (err, list) {
+				if (err) {
+					return grunt.fatal('Failed to list content of bucket ' + options.bucket + '\n' + err);
 				}
-				else {
-					grunt.fatal('Failed to list content of bucket ' + options.bucket + '\n' + err);
+
+				var objects = (contents) ? contents.concat(list.Contents) : list.Contents;
+
+				if (list.IsTruncated) {
+					var new_marker = _.last(list.Contents).Key;
+					listObjects(prefix, callback, new_marker, objects);
+				} else {
+					callback(_.uniq(objects, function (o) { return o.Key; }));
 				}
 			});
 		};
 
 		var deleteObjects = function (task, callback) {
-
 			grunt.log.writeln('Deleting the content of ' + getObjectURL(task.dest).cyan);
 
 			// List all the objects using dest as the prefix
 			listObjects(task.dest, function (to_delete) {
 
 				// List local content if it's a differential task
-				var local_files = (task.differential) ? grunt.file.expand({ cwd: task.cwd }, ["**"]) : [];
+				var localFiles = (task.differential) ? grunt.file.expand({ cwd: task.cwd }, ["**"]) : [];
 
 				_.each(to_delete, function (o) {
 
@@ -403,7 +384,7 @@ module.exports = function (grunt) {
 
 					if (task.differential && !o.excluded) {
 						// Exists locally or not (remove dest in the key to get the local path)
-						o.need_delete = local_files.indexOf(getRelativeKeyPath(o.Key, task.dest)) === -1;
+						o.need_delete = localFiles.indexOf(getRelativeKeyPath(o.Key, task.dest)) === -1;
 					}
 				});
 
@@ -558,7 +539,7 @@ module.exports = function (grunt) {
 
 		var doDownload = function (object, callback) {
 
-			if (options.debug || !object.need_download || object.excluded) {
+			if (options.debug || !object.needDownload || object.excluded) {
 				callback(null, false);
 			}
 			else if (object.stream) {
@@ -595,16 +576,14 @@ module.exports = function (grunt) {
 		};
 
 		var downloadObjects = function (task, callback) {
-
 			grunt.log.writeln('Downloading the content of ' + getObjectURL(task.dest).cyan + ' to ' + task.cwd.cyan);
 
 			// List all the objects using dest as the prefix
-			listObjects(task.dest, function (to_download) {
-
+			listObjects(task.dest, function (toDownload) {
 				// List local content if it's a differential task
-				var local_files = (task.differential) ? grunt.file.expand({ cwd: task.cwd }, ["**"]) : [];
+				var localFiles = (task.differential) ? grunt.file.expand({ cwd: task.cwd }, ["**"]) : [];
 
-				if (to_download.length === 0) {
+				if (toDownload.length === 0) {
 					callback(null, null);
 				}
 				else {
@@ -614,33 +593,33 @@ module.exports = function (grunt) {
 						var key = getRelativeKeyPath(object.Key, task.dest); // Remove the dest in the key to not duplicate the path with cwd
 						object.dest = task.cwd + key;
 						object.stream = task.stream;
-						object.need_download = _.last(object.dest) !== '/'; // no need to write directories
+						object.needDownload = _.last(object.dest) !== '/'; // no need to write directories
 						object.excluded = task.exclude && grunt.file.isMatch(task.exclude, object.Key);
 
 						if (task.exclude && task.flipExclude) {
 							object.excluded = !object.excluded;
 						}
 
-						if (task.differential && object.need_download && !object.excluded) {
-							var local_index = local_files.indexOf(key);
+						if (task.differential && object.needDownload && !object.excluded) {
+							var localIndex = localFiles.indexOf(key);
 
 							// If file exists locally we need to check if it's different
-							if (local_index !== -1) {
-								
+							if (localIndex !== -1) {
+
 								// Check md5 and if file is older than server file
-								var check_options = { 
-									file_path: object.dest, 
-									server_hash: object.ETag, 
-									server_date: object.LastModified, 
-									date_compare: 'older' 
+								var checkOptions = {
+									filePath: object.dest,
+									serverHash: object.ETag,
+									serverDate: object.LastModified,
+									dateCompare: 'older'
 								};
 
-								isFileDifferent(check_options, function (err, different) {
+								isFileDifferent(checkOptions, function (err, different) {
 									if (err) {
 										downloadCallback(err);
 									}
 									else {
-										object.need_download = different;
+										object.needDownload = different;
 										setImmediate(doDownload, object, downloadCallback);
 									}
 								});
@@ -657,14 +636,14 @@ module.exports = function (grunt) {
 
 					download_queue.drain = function () {
 
-						callback(null, to_download);
+						callback(null, toDownload);
 					};
 
 					if(options.progress === 'progressBar'){
-						var progress = new Progress('[:bar] :current/:total :etas', {total : to_download.length});
+						var progress = new Progress('[:bar] :current/:total :etas', {total : toDownload.length});
 					}
 
-					download_queue.push(to_download, function (err, downloaded) {
+					download_queue.push(toDownload, function (err, downloaded) {
 
 						if (err) {
 							grunt.fatal('Failed to download ' + getObjectURL(this.data.Key) + '\n' + err);
@@ -724,9 +703,7 @@ module.exports = function (grunt) {
 		};
 
 		var doUpload = function (object, callback) {
-
-			if (object.need_upload && !options.debug) {
-
+			if (object.needUpload && !options.debug) {
 				var type = options.mime[object.src] || object.params.ContentType || mime.contentType(mime.lookup(object.src) || "application/octet-stream");
 				var upload = _.defaults({
 					ContentType: type,
@@ -737,50 +714,52 @@ module.exports = function (grunt) {
 
 				if (object.stream) {
 					upload.Body = fs.createReadStream(object.src);
-				}
-				else {
+				} else {
 					upload.Body = grunt.file.read(object.src, { encoding: null });
 				}
 
 				s3.putObject(upload, function (err, data) {
 					callback(err, true);
 				});
-			}
-			else {
+			}	else {
 				callback(null, false);
 			}
 		};
 
 		var uploadObjects = function (task, callback) {
-
 			grunt.log.writeln('Uploading to ' + getObjectURL(task.dest).cyan);
+			grunt.log.writeln('Overwrite mode: ' + options.overwrite.yellow);
 
-			var startUploads = function (server_files) {
-
-				var upload_queue = async.queue(function (object, uploadCallback) {
-
+			var startUploads = function (serverFiles) {
+				var uploadQueue = async.queue(function (object, uploadCallback) {
 					doCompressionRename(object, options);
 
-					var server_file = _.where(server_files, { Key: object.dest })[0];
+					var serverFile = _.filter(serverFiles, { Key: object.dest })[0];
 
-					if (server_file && !options.overwrite) {
-						uploadCallback(object.dest + " already exists!")
+					if (serverFile && options.overwrite == 'halt') {
+						return uploadCallback(object.dest + " already exists!");
 					}
-					else if (server_file && object.differential) {
 
-						isFileDifferent({ file_path: object.src, server_hash: server_file.ETag }, function (err, different) {
-							object.need_upload = different;
+					if (serverFile && options.overwrite == 'skip') {
+						object.needUpload = false;
+						return uploadCallback();
+					}
+
+					if (serverFile && options.overwrite == 'force') {
+						return setImmediate(doUpload, object, uploadCallback);
+					}
+
+					if (serverFile && object.differential) {
+						return isFileDifferent({ filePath: object.src, serverHash: serverFile.ETag }, function (err, different) {
+							object.needUpload = different;
 							setImmediate(doUpload, object, uploadCallback);
 						});
 					}
-					else {
-						setImmediate(doUpload, object, uploadCallback);
-					}
 
+					setImmediate(doUpload, object, uploadCallback);
 				}, options.uploadConcurrency);
 
-				upload_queue.drain = function () {
-
+				uploadQueue.drain = function () {
 					callback(null, task.files);
 				};
 
@@ -788,7 +767,7 @@ module.exports = function (grunt) {
 					var progress = new Progress('[:bar] :current/:total :etas', { total : task.files.length });
 				}
 
-				upload_queue.push(task.files, function (err, uploaded) {
+				uploadQueue.push(task.files, function (err, uploaded) {
 
 					if (err) {
 						grunt.fatal('Failed to upload ' + this.data.src + ' with bucket ' + options.bucket + '\n' + err);
@@ -810,17 +789,19 @@ module.exports = function (grunt) {
 				});
 			};
 
+      // Walk the list of files and extract the top level common directories
 			var unique_dests = _(task.files)
 				.filter('differential')
-				.pluck('dest')
+				.map('dest')
 				.compact()
 				.map(path.dirname)
-				.sort()
 				.uniq(true)
+				.sort()
 				.reduce(function (res, dest) {
-
 					var last_path = res[res.length - 1];
 
+          // ignore this destination path if it is similar to last path
+          // `images/**` will be skipped if last path was `images`
 					if (!last_path || dest.indexOf(last_path) !== 0) {
 						res.push(dest);
 					}
@@ -829,7 +810,9 @@ module.exports = function (grunt) {
 				}, []);
 
 			// If there's a '.', we need to scan the whole bucket
-			if (unique_dests.indexOf('.') > -1 || !options.overwrite) {
+			if (unique_dests.indexOf('.') > -1 ||
+				options.overwrite == 'skip' ||
+				options.overwrite == 'halt') {
 				unique_dests = [''];
 			}
 
@@ -841,10 +824,10 @@ module.exports = function (grunt) {
 				}, function (err, objects) {
 					if (err) {
 						callback(err);
-					} 
+					}
 					else {
-						var server_files = Array.prototype.concat.apply([], objects);
-						startUploads(server_files);
+						var serverFiles = Array.prototype.concat.apply([], objects);
+						startUploads(serverFiles);
 					}
 				});
 			} else {
@@ -853,7 +836,6 @@ module.exports = function (grunt) {
 		};
 
 		var queue = async.queue(function (task, callback) {
-
 			if (task.action === 'delete') {
 				deleteObjects(task, callback);
 			}
@@ -869,9 +851,7 @@ module.exports = function (grunt) {
 		}, 1);
 
 		queue.drain = function () {
-
 			_.each(objects, function (o) {
-
 				if (o.action === "delete") {
 					grunt.log.writeln(o.deleted.toString().green + '/' + o.nb_objects.toString().green + ' objects deleted from ' + (options.bucket + '/' + o.dest).green);
 				}
@@ -890,25 +870,25 @@ module.exports = function (grunt) {
 				grunt.log.writeln("\nThe debug option was enabled, no changes have actually been made".yellow);
 			}
 
-			var uploadedFiles = []
+			var uploadedFiles = [];
 
 			_.each(objects, function (o) {
-				if (!o.action || o.action === 'upload') {	
+				if (!o.action || o.action === 'upload') {
 					_.each(o.files, function (file) {
-						if (file.need_upload) {
-							uploadedFiles.push(file.dest)
+						if (file.needUpload) {
+							uploadedFiles.push(file.dest);
 						}
 					});
 				}
-			})
+			});
 
-			grunt.config.set(options.changedFiles, uploadedFiles)
+			grunt.config.set(options.changedFiles, uploadedFiles);
 
-			done()
+			done();
 		};
 
 		if (objects.length === 0) {
-			queue.drain()
+			queue.drain();
 		}
 		else {
 			queue.push(objects, function (err, res) {
@@ -936,7 +916,7 @@ module.exports = function (grunt) {
 								}
 								else {
 									var sign = (file.excluded) ? '! ' : '- ';
-									grunt.log.writeln(sign + file.Key.yellow);
+									grunt.verbose.writeln(sign + file.Key.yellow);
 								}
 							});
 
@@ -955,21 +935,20 @@ module.exports = function (grunt) {
 						grunt.fatal('Download failed\n' + err.toString());
 					}
 					else {
-						if (res && res.length > 0) {												
-							grunt.log.writeln('\nList: (' + res.length.toString().cyan + ' objects):');
+						if (res && res.length > 0) {
+							grunt.verbose.writeln('\nList: (' + res.length.toString().cyan + ' objects):');
 
 							var task = this.data;
 							var downloaded = 0;
 
 							_.each(res, function (file) {
-
-								if (file.need_download && !file.excluded) {
+								if (file.needDownload && !file.excluded) {
 									downloaded++;
 									grunt.log.writeln('- ' + getObjectURL(file.Key).cyan + ' -> ' + (task.cwd + getRelativeKeyPath(file.Key, task.dest)).cyan);
 								}
 								else {
 									var sign = (file.excluded) ? ' =/= ' : ' === ';
-									grunt.log.writeln('- ' + getObjectURL(file.Key).yellow + sign + (task.cwd + getRelativeKeyPath(file.Key, task.dest)).yellow);
+									grunt.verbose.writeln('- ' + getObjectURL(file.Key).yellow + sign + (task.cwd + getRelativeKeyPath(file.Key, task.dest)).yellow);
 								}
 							});
 
@@ -988,21 +967,20 @@ module.exports = function (grunt) {
 						grunt.fatal('Copy failed\n' + err.toString());
 					}
 					else {
-						if (res && res.length > 0) {												
+						if (res && res.length > 0) {
 							grunt.log.writeln('\nList: (' + res.length.toString().cyan + ' objects):');
 
 							var task = this.data;
 							var copied = 0;
 
 							_.each(res, function (file) {
-
 								if (file.need_copy && !file.excluded) {
 									copied++;
 									grunt.log.writeln('- ' + (options.bucket + '/' + file.Key).cyan + ' -> ' + (options.bucket + '/' + task.dest + getRelativeKeyPath(file.Key, task.dest)).cyan);
 								}
 								else {
 									var sign = (file.excluded) ? ' =/= ' : ' === ';
-									grunt.log.writeln('- ' + (options.bucket + '/' + file.Key).yellow + sign + (options.bucket + '/' + task.dest + getRelativeKeyPath(file.Key, task.dest)).yellow);
+									grunt.verbose.writeln('- ' + (options.bucket + '/' + file.Key).yellow + sign + (options.bucket + '/' + task.dest + getRelativeKeyPath(file.Key, task.dest)).yellow);
 								}
 							});
 
@@ -1021,18 +999,17 @@ module.exports = function (grunt) {
 						grunt.fatal('Upload failed\n' + err.toString());
 					}
 					else {
-						grunt.log.writeln('\nList: (' + res.length.toString().cyan + ' objects):');
+						grunt.verbose.writeln('\nList: (' + res.length.toString().cyan + ' objects):');
 
 						var uploaded = 0;
 
 						_.each(res, function (file) {
-
-							if (file.need_upload) {
+							if (file.needUpload) {
 								uploaded++;
 								grunt.log.writeln('- ' + file.src.cyan + ' -> ' + (object_url + file.dest).cyan);
 							}
 							else if (!options.displayChangesOnly) {
-								grunt.log.writeln('- ' + file.src.yellow + ' === ' + (object_url + file.dest).yellow);
+								grunt.verbose.writeln('- ' + file.src.yellow + ' === ' + (object_url + file.dest).yellow);
 							}
 						});
 
@@ -1050,8 +1027,8 @@ module.exports = function (grunt) {
 
 		if (process.platform === 'win32') {
 			return filepath.replace(/\\/g, '/');
-		} 
-		else {	
+		}
+		else {
 			return filepath;
 		}
 	};
