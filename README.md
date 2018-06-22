@@ -193,10 +193,12 @@ Type: `String`
 Default: `differential`
 
 Valid options are:
-- `differential`: Looks at the options.differential to decide whether to overwrite or not.
-- `skip`: The file isn't uploaded if already exists on remote
-- `force`: Will always write the file to the server
+- `differential`: Looks at the `options.differential` to decide whether to overwrite the remote file.
+- `skip`: This file is skipped if it collides with one on the server.
+- `force`: Will always write the file to the server.
 - `halt`: Throws an error and exits on the first instance it encounters a same file on the remote server
+
+Note: While using `skip`, `force`, or `halt`, the value of `options.differential` is ignored.
 
 #### options.displayChangesOnly
 Type: `Boolean`
@@ -509,7 +511,7 @@ aws_s3: {
   }
 },
 ```
-##Testing
+## Testing
 ```shell
   yarn run test
 ```
