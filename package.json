@@ -2,22 +2,23 @@
   "name": "grunt-aws-s3",
   "description": "Interact with AWS S3 using the AWS SDK",
   "version": "2.0.0",
-  "homepage": "https://github.com/MathieuLoutre/grunt-aws-s3",
+  "homepage": "https://github.com/sumeetattree/grunt-aws-s3",
   "author": {
     "name": "Mathieu Triay",
     "email": "mathieu.triay@gmail.com"
   },
+  "contributors": [],
   "repository": {
     "type": "git",
-    "url": "git://github.com/MathieuLoutre/grunt-aws-s3.git"
+    "url": "git://github.com/sumeetattree/grunt-aws-s3.git"
   },
   "bugs": {
-    "url": "https://github.com/MathieuLoutre/grunt-aws-s3/issues"
+    "url": "https://github.com/sumeetattree/grunt-aws-s3/issues"
   },
   "licenses": [
     {
       "type": "MIT",
-      "url": "https://github.com/MathieuLoutre/grunt-aws-s3/blob/master/LICENSE"
+      "url": "https://github.com/sumeetattree/grunt-aws-s3/blob/master/LICENSE"
     }
   ],
   "engines": {
@@ -29,24 +30,25 @@
     "test": "grunt"
   },
   "dependencies": {
-    "aws-sdk": "^2.259.1",
-    "mime-types": "^2.1.18",
-    "lodash": "^4.17.10",
     "async": "^2.6.1",
+    "aws-sdk": "^2.259.1",
+    "lodash": "^4.17.10",
+    "mime-types": "^2.1.18",
     "progress": "^2.0.0"
   },
   "devDependencies": {
-    "grunt-contrib-jshint": "^1.1.0",
-    "grunt": "^1.0.3",
     "chai": "^1.7.2",
-    "mocha": "^5.2.0",
-    "grunt-mocha-test": "^0.13.3",
-    "grunt-contrib-copy": "^1.0.0",
+    "grunt": "^1.0.3",
+    "grunt-bump": "^0.8.0",
     "grunt-contrib-clean": "^1.1.0",
+    "grunt-contrib-copy": "^1.0.0",
+    "grunt-contrib-jshint": "^1.1.0",
+    "grunt-mocha-test": "^0.13.3",
+    "mocha": "^5.2.0",
     "mock-aws-s3": "^2.5.0"
   },
   "peerDependencies": {
-    "grunt": ">=1.0.3"
+    "grunt": ">=1.0.0"
   },
   "keywords": [
     "gruntplugin",

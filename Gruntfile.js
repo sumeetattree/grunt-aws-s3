@@ -8,14 +8,18 @@
 
 'use strict';
 
-module.exports = function (grunt) {
+var fs = require('fs');
+var exec = require('child_process').exec;
+var path = require('path');
 
+module.exports = function (grunt) {
 	grunt.registerTask('create_bucket', 'creates the bucket folder', function() {
 		grunt.file.mkdir(__dirname + '/test/local/bucket');
 	});
 
 	// Project configuration.
 	grunt.initConfig({
+		pkg: grunt.file.readJSON('package.json'),
 		jshint: {
 			all: [
 				'tasks/*.js'
@@ -79,6 +83,14 @@ module.exports = function (grunt) {
 					{expand: true, cwd: 'test/fixtures/', src: ['**'], dest: 'test/local'},
 				]
 			}
+		},
+		bump: {
+			options: {
+				files: ['package.json'],
+				tagName: "%VERSION%",
+				commit: false,
+				push: false
+			},
 		}
 	});
 
@@ -89,6 +101,43 @@ module.exports = function (grunt) {
 	grunt.loadNpmTasks('grunt-mocha-test');
 	grunt.loadNpmTasks('grunt-contrib-clean');
 	grunt.loadNpmTasks('grunt-contrib-copy');
+	grunt.loadNpmTasks('grunt-bump');
+
+	grunt.registerTask('contributors', 'Updates the list of contributors in package.json', function() {
+		var done = this.async();
+		exec("git log --format='%aN <%aE>' | sort -f | uniq", function(err, stdout) {
+			if (err) {
+				return grunt.fatal(err);
+			}
+
+			var list = stdout.split(/[\r?\n]+/);
+			var contributors = [];
+			list.forEach(function(name) {
+				if (name != null && name != undefined && name != '') {
+					contributors.push(name);
+				}
+			});
+
+			grunt.config('pkg.contributors', contributors);
+			grunt.file.write('package.json', JSON.stringify(grunt.config('pkg'), null, 2));
+			done();
+		});
+	});
+
+	grunt.registerTask(
+		'release',
+		'Alias for `bump` and `contributors`.' +
+		'Takes the same list of parameters as the task `bump`. ' +
+		'See task `bump` for a full list',
+		function(bumpStrategy) {
+			var bumpTask = 'bump';
+			if (bumpStrategy) {
+				bumpTask += ':' + bumpStrategy;
+			}
+			grunt.task.run(bumpTask);
+			grunt.task.run('contributors');
+		}
+	);
 
 	grunt.registerTask('default', ['clean', 'copy', 'create_bucket', 'aws_s3:test_local', 'mochaTest']);
 	grunt.registerTask('test-live', ['clean', 'copy', 'aws_s3:test_live']);

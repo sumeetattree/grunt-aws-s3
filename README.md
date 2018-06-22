@@ -1,22 +1,27 @@
 # grunt-aws-s3
-
+Fork of [MathieuLoutre/grunt-aws-s3](https://github.com/MathieuLoutre/grunt-aws-s3.git)
 > Interact with AWS S3 using AWS SDK
-
-## TODO:
-Update this readme
 
 ## Warning
 
-Versions 0.4.0 to 0.5.0 have a bug where `options.params` is ignored.  
-Version 0.8.0 doesn't actually support Node 0.8.x and 0.9.x.  
+This is not actively maintained. I forked this for use in our in-house projects.
+
+Versions 0.4.0 to 0.5.0 have a bug where `options.params` is ignored.
+Version 0.8.0 doesn't actually support Node 0.8.x and 0.9.x.
 
 It's not recommended to use concurrencies over 100 as you may run into EMFILE/ENOTFOUND errors.
 
 ## Getting Started
-This plugin requires Grunt `~0.4.0`
+This plugin requires Grunt `~1.0.0`
 
 If you haven't used [Grunt](http://gruntjs.com/) before, be sure to check out the [Getting Started](http://gruntjs.com/getting-started) guide, as it explains how to create a [Gruntfile](http://gruntjs.com/sample-gruntfile) as well as install and use Grunt plugins. Once you're familiar with that process, you may install this plugin with this command:
 
+Yarn is recommended.
+```shell
+  yarn add https://github.com/sumeetattree/grunt-aws-s3.git --dev
+  # See https://yarnpkg.com/lang/en/docs/cli/add/ on how to add repositories using git urls
+```
+Note: If you are using npm replace `yarn` with `npm`
 ```shell
   npm install grunt-aws-s3 --save-dev
 ```
@@ -64,13 +69,13 @@ Type: `String`
 The AWS endpoint you'd like to use. Set by default by the region.
 
 #### options.s3ForcePathStyle
-Type: `Boolean`  
+Type: `Boolean`
 Default: `false`
 
 Force use path-style url (http://endpoint/bucket/path) instead of default host-style (http://bucket.endpoint/path)
 
 #### options.region
-Type: `String`  
+Type: `String`
 Default: `US Standard`
 
 The AWS [region](http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region).
@@ -83,41 +88,41 @@ Type: `Integer`
 The maximum amount of retries to attempt with a request.
 
 #### options.sslEnabled
-Type: `Boolean`  
+Type: `Boolean`
 
 Whether to enable SSL for requests or not.
 
 #### options.httpOptions
-Type: `Object`  
+Type: `Object`
 
 A set of options to pass to the low-level HTTP request. The list of options can be found in the [documentation](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#constructor-property)
 
 #### options.signatureVersion
-Type: `String`  
+Type: `String`
 
 Change the signature version to sign requests with. Possible values are: 'v2', 'v3', 'v4'.
 
 #### options.access
-Type: `String`  
+Type: `String`
 Default:`public-read`
 
 The ACL you want to apply to ALL the files that will be uploaded. The ACL values can be found in the [documentation](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property).
 
 #### options.uploadConcurrency
-Type: `Integer`  
+Type: `Integer`
 Default: `1`
 
 Number of uploads in parallel. By default, there's no concurrency. Must be > 0.
 Note: This used to be called `concurrency` but the option has been deprecated, however it is still backwards compatible until 1.0.0.
 
 #### options.downloadConcurrency
-Type: `Integer`  
+Type: `Integer`
 Default: `1`
 
 Number of download in parallel. By default, there's no concurrency. Must be > 0.
 
 #### options.copyConcurrency
-Type: `Integer`  
+Type: `Integer`
 Default: `1`
 
 Number of copies in parallel. By default, there's no concurrency. Must be > 0.
@@ -128,7 +133,7 @@ Type: `Object`
 A hash of the params you want to apply to the files. Useful to set the `ContentEncoding` to `gzip` for instance, or set the `CacheControl` value. The list of parameters can be found in the [documentation](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#putObject-property). `params` will apply to *all* the files in the target. However, the `params` option in the file list has priority over it.
 
 #### options.mime
-Type: `Object`  
+Type: `Object`
 
 The MIME type of every file is determined by a MIME lookup using [node-mime](https://github.com/broofa/node-mime). If you want to override it, you can use this option object.
 The keys are the local file paths and the values are the MIME types.
@@ -140,11 +145,11 @@ The keys are the local file paths and the values are the MIME types.
   }
 ```
 
-You need to specify the full path of the file, including the `cwd` part.  
+You need to specify the full path of the file, including the `cwd` part.
 The `mime` hash has absolute priority over what has been set in `options.params` and the `params` option of the file list.
 
 #### options.stream
-Type: `Boolean`  
+Type: `Boolean`
 Default: `false`
 
 Allows to use streams instead of buffers to upload and download.
@@ -155,14 +160,14 @@ The option can either be turned on for the whole subtask or for a specified file
 ```
 
 #### options.debug
-Type: `Boolean`  
+Type: `Boolean`
 Default: `false`
 
-This will do a "dry run". It will not upload anything to S3 but you will get the full report just as you would in normal mode. Useful to check what will be changed on the server before actually doing it. Unless one of your actions depends on another (like download following a delete), the report should be accurate.  
+This will do a "dry run". It will not upload anything to S3 but you will get the full report just as you would in normal mode. Useful to check what will be changed on the server before actually doing it. Unless one of your actions depends on another (like download following a delete), the report should be accurate.
 `listObjects` requests will still be made to list the content of the bucket.
 
 #### options.differential
-Type: `Boolean`  
+Type: `Boolean`
 Default: `false`
 
 `listObjects` requests will be made to list the content of the bucket, then they will be checked against their local file equivalent (if it exists) using MD5 (and sometimes date) comparisons.
@@ -184,10 +189,14 @@ In order to be able to compare to the local file names, it is necessary for `des
 ```
 
 #### options.overwrite
-Type: `Boolean`  
-Default: `true`
+Type: `String`
+Default: `differential`
 
-By setting this options to `false`, you can prevent overwriting files on the server. The task will scan the whole bucket first and if it encounters a path that's about to be erased will stop.
+Valid options are:
+- `differential`: Looks at the options.differential to decide whether to overwrite or not.
+- `skip`: The file isn't uploaded if already exists on remote
+- `force`: Will always write the file to the server
+- `halt`: Throws an error and exits on the first instance it encounters a same file on the remote server
 
 #### options.displayChangesOnly
 Type: `Boolean`
@@ -372,7 +381,7 @@ The `delete` action just requires a `dest`, no need for a `src` like so:
 
 The `dest` is used as the Prefix in the [listObjects command](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#listObjects-property) to find the files _on the server_ (which means it can be a path or a partial path).
 
-If you specify '/', the whole bucket will be wiped. It handles automatically buckets with more than a 1000 objects.  
+If you specify '/', the whole bucket will be wiped. It handles automatically buckets with more than a 1000 objects.
 If you specify 'app', all paths starting with 'app' will be targeted (e.g. 'app.js', 'app/myapp.js', 'app/index.html, 'app backup/donotdelete.js') but it will leave alone the others (e.g. 'my app/app.js', 'backup app/donotdelete.js').
 
 When the `differential` options is enabled, it will only delete the files which don't exist locally. It also requires a `cwd` key with the path to the local folder to check against.
@@ -499,6 +508,10 @@ aws_s3: {
     ]
   }
 },
+```
+##Testing
+```shell
+  yarn run test
 ```
 
 ## Todos
