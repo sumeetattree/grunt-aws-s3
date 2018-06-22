@@ -2,7 +2,10 @@
 
 > Interact with AWS S3 using AWS SDK
 
-## Warning 
+## TODO:
+Update this readme
+
+## Warning
 
 Versions 0.4.0 to 0.5.0 have a bug where `options.params` is ignored.  
 Version 0.8.0 doesn't actually support Node 0.8.x and 0.9.x.  
@@ -276,7 +279,7 @@ Lastly don't forget to set `expand: true` where you use the `cwd` property or Gr
 You can also include a `params` hash which will override the options.params one. For example:
 
 ```js
-  
+
   params: {
     ContentType: 'application/json'
     CacheControl: '3000'
@@ -326,13 +329,13 @@ The `download` action requires a `cwd`, a `dest` and *no* `src` like so:
   {cwd: 'download/', dest: 'app/', action: 'download'}
 ```
 
-The `dest` is used as the Prefix in the [listObjects command](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#listObjects-property) to find the files _on the server_ (which means it can be a path or a partial path). 
+The `dest` is used as the Prefix in the [listObjects command](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#listObjects-property) to find the files _on the server_ (which means it can be a path or a partial path).
 The `cwd` is used as the root folder to write the downloaded files. The inner folder structure will be reproduced inside that folder.
 
 If you specify '/' for `dest`, the whole bucket will be downloaded. It handles automatically buckets with more than a 1000 objects.  
 If you specify 'app', all paths starting with 'app' will be targeted (e.g. 'app.js', 'app/myapp.js', 'app/index.html, 'app backup/donotdelete.js') but it will leave alone the others (e.g. 'my app/app.js', 'backup app/donotdelete.js').
 
-When the `differential` options is enabled, it will only download the files which either don't exist locally or have a different MD5 hash and are newer. 
+When the `differential` options is enabled, it will only download the files which either don't exist locally or have a different MD5 hash and are newer.
 
 Note: if `dest` is a file, it will be downloaded to `cwd` + `file name`. If `dest` is a directory ending with `/`, its content will be downloaded to `cwd` + `file names or directories found in dest`. If `dest` is neither a file nor a directory, the files found using it as a prefix will be downloaded to `cwd` + `paths found using dest as the prefix`.
 
@@ -367,7 +370,7 @@ The `delete` action just requires a `dest`, no need for a `src` like so:
   {dest: 'app/', 'action': 'delete'}
 ```
 
-The `dest` is used as the Prefix in the [listObjects command](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#listObjects-property) to find the files _on the server_ (which means it can be a path or a partial path). 
+The `dest` is used as the Prefix in the [listObjects command](http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#listObjects-property) to find the files _on the server_ (which means it can be a path or a partial path).
 
 If you specify '/', the whole bucket will be wiped. It handles automatically buckets with more than a 1000 objects.  
 If you specify 'app', all paths starting with 'app' will be targeted (e.g. 'app.js', 'app/myapp.js', 'app/index.html, 'app backup/donotdelete.js') but it will leave alone the others (e.g. 'my app/app.js', 'backup app/donotdelete.js').
@@ -504,7 +507,7 @@ aws_s3: {
 
 ## Release History
 * 2017-09-12   v2.0.0   Support for more compression algorithms by @smeder
-* 2017-05-20   v1.0.0   Warning when cwd used without expand by @stevemayhew. 
+* 2017-05-20   v1.0.0   Warning when cwd used without expand by @stevemayhew.
 * 2016-04-05   v0.14.5  Support for grunt 1.0.0
 * 2016-01-04   v0.14.4  add `s3ForcePathStyle` to params by @albert-lacki
 * 2015-12-06   v0.14.3  auto generate fixtures by @frankcortes
