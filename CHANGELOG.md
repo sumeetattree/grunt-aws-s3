@@ -1,5 +1,10 @@
 # CHANGELOG
 
+### 3.0.0
+- Switched to grunt `1.0.0`
+- Updated all dependencies to their latest versions
+- Expanded `options.overwrite` to include multiple options. See: `options.overwrite` for explanation
+
 ### v2.0.0
 - Support different compression algorithms, remove support for `gzipRename`, use `compressionRename` now (by @smeder)
 
@@ -62,8 +67,8 @@
 - Fix charset with new mime package by @jeantil
 
 ### v0.10.0
-- Endpoint option. 
-- Drop support for 0.8.x. 
+- Endpoint option.
+- Drop support for 0.8.x.
 - Fix uploading an empty dir #40
 - Unify dest base format #44
 - FIx uploading no files #46
