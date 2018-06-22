@@ -88,7 +88,7 @@ module.exports = function (grunt) {
 			options: {
 				files: ['package.json'],
 				updateConfigs: ['pkg'],
-				tagName: "%VERSION%",
+				createTag: false,
 				commit: false,
 				push: false
 			},
